@@ -34,6 +34,7 @@ import ninja.leaping.permissionsex.util.command.args.CommandElement;
 
 import javax.annotation.Nullable;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static ninja.leaping.permissionsex.util.Translations.t;
 import static ninja.leaping.permissionsex.util.command.args.GameArguments.*;
@@ -112,12 +113,19 @@ public class PermissionsExCommands {
                 .setAliases("debug", "d")
                 .setDescription(t("Toggle debug mode"))
                 .setPermission("permissionsex.debug")
+                .setArguments(optional(string(t("filter"))))
                 .setExecutor(new CommandExecutor() {
                     @Override
                     public <TextType> void execute(Commander<TextType> src, CommandContext args) throws CommandException {
-                       boolean debugEnabled = !pex.hasDebugMode();
-                        pex.setDebugMode(debugEnabled);
-                        src.msg(t("Debug mode enabled: %s", src.fmt().booleanVal(debugEnabled)));
+                        boolean debugEnabled = !pex.hasDebugMode();
+                        String filter = args.getOne("filter");
+                        if (filter != null) {
+                            pex.setDebugMode(debugEnabled, Pattern.compile(filter));
+                            src.msg(t("Debug mode enabled: %s with filter %s", src.fmt().booleanVal(debugEnabled), src.fmt().hl(src.fmt().combined(filter))));
+                        } else {
+                            pex.setDebugMode(debugEnabled);
+                            src.msg(t("Debug mode enabled: %s", src.fmt().booleanVal(debugEnabled)));
+                        }
                     }
                 })
                 .build();

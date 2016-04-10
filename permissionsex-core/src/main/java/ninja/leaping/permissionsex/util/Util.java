@@ -16,10 +16,15 @@
  */
 package ninja.leaping.permissionsex.util;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import ninja.leaping.permissionsex.PermissionsEx;
 import ninja.leaping.permissionsex.util.command.args.GenericArguments;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -55,11 +60,11 @@ public class Util {
         return ret;
     }
 
-    public static <I, T> CompletableFuture<T> failableFuture(I value, ThrowingFunction<I, T> func) {
+    public static <I, T> CompletableFuture<T> failableFuture(I value, ThrowingFunction<I, T, ?> func) {
         return failableFuture(() -> func.apply(value));
     }
 
-    public static <T> CompletableFuture<T> failableFuture(ThrowingSupplier<T> func) {
+    public static <T> CompletableFuture<T> failableFuture(ThrowingSupplier<T, ?> func) {
         CompletableFuture<T> ret = new CompletableFuture<>();
         try {
             ret.complete(func.supply());
@@ -69,7 +74,7 @@ public class Util {
         return ret;
     }
 
-    public static <T> CompletableFuture<T> asyncFailableFuture(ThrowingSupplier<T> supplier, Executor exec) {
+    public static <T> CompletableFuture<T> asyncFailableFuture(ThrowingSupplier<T, ?> supplier, Executor exec) {
         CompletableFuture<T> ret = new CompletableFuture<>();
         exec.execute(() -> {
             try {
@@ -80,5 +85,28 @@ public class Util {
 
         });
         return ret;
+    }
+
+    public static <K, V> Map<K, V> updateImmutable(Map<K, V> input, K newKey, V newVal) {
+        if (input == null) {
+            return ImmutableMap.of(newKey, newVal);
+        }
+        Map<K, V> ret = new HashMap<>(input);
+        if (newVal == null) {
+            ret.remove(newKey);
+        } else {
+            ret.put(newKey, newVal);
+        }
+        return Collections.unmodifiableMap(ret);
+    }
+
+    public static <T> ImmutableList<T> appendImmutable(List<T> input, T entry) {
+        if (input == null) {
+            return ImmutableList.of(entry);
+        }
+        ImmutableList.Builder<T> ret = ImmutableList.builder();
+        ret.addAll(input);
+        ret.add(entry);
+        return ret.build();
     }
 }

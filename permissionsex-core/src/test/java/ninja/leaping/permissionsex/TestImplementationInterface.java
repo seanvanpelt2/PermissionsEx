@@ -18,12 +18,16 @@ package ninja.leaping.permissionsex;
 
 import com.google.common.collect.ImmutableSet;
 import ninja.leaping.permissionsex.util.command.CommandSpec;
+import org.h2.jdbcx.JdbcDataSource;
+import org.postgresql.ds.PGSimpleDataSource;
+import org.postgresql.xa.PGXADataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.io.File;
 import java.nio.file.Path;
+import java.sql.DriverManager;
 import java.util.Set;
 import java.util.concurrent.Executor;
 
@@ -47,7 +51,15 @@ public class TestImplementationInterface implements ImplementationInterface {
 
     @Override
     public DataSource getDataSourceForURL(String url) {
-        return null;
+        if (url.startsWith("jdbc:h2")) {
+            JdbcDataSource ds = new JdbcDataSource();
+            ds.setURL(url);
+            return ds;
+        } else if (url.startsWith("jdbc:mysql")) {
+
+        } else if (url.startsWith("jdbc:postgresql")) {
+        }
+        throw new IllegalArgumentException("Unsupported database implementation!");
     }
 
     /**

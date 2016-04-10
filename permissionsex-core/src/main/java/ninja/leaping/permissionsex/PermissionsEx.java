@@ -64,6 +64,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -256,9 +257,13 @@ public class PermissionsEx implements ImplementationInterface, Caching<ContextIn
     }
 
     public void setDebugMode(boolean debug) {
+        setDebugMode(debug, null);
+    }
+
+    public void setDebugMode(boolean debug, Pattern filterPattern) {
         if (debug) {
             if (!(this.notifier instanceof DebugPermissionCheckNotifier)) {
-                this.notifier = new DebugPermissionCheckNotifier(getLogger(), this.notifier);
+                this.notifier = new DebugPermissionCheckNotifier(getLogger(), this.notifier, filterPattern == null ? null : perm -> filterPattern.matcher(perm).find());
             }
         } else {
             if (this.notifier instanceof DebugPermissionCheckNotifier) {

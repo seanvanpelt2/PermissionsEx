@@ -29,10 +29,12 @@ import ninja.leaping.permissionsex.data.ContextInheritance;
 import ninja.leaping.permissionsex.data.ImmutableSubjectData;
 import ninja.leaping.permissionsex.exception.PermissionsLoadingException;
 import ninja.leaping.permissionsex.rank.RankLadder;
+import ninja.leaping.permissionsex.util.ThrowingSupplier;
 import ninja.leaping.permissionsex.util.Util;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -96,6 +98,14 @@ public abstract class AbstractDataStore implements DataStore {
                     }
                     return newData;
                 });
+    }
+
+    protected <T> CompletableFuture<T> runAsync(ThrowingSupplier<T, ?> supplier) {
+        return Util.asyncFailableFuture(supplier, getManager().getAsyncExecutor());
+    }
+
+    protected CompletableFuture<Void> runAsync(Runnable run) {
+        return CompletableFuture.runAsync(run, getManager().getAsyncExecutor());
     }
 
     /**

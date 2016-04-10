@@ -16,12 +16,13 @@
  */
 package ninja.leaping.permissionsex.util;
 
-/**
- * An interface defining a function that may throw an exception
- * @param <I>
- * @param <O>
- */
-@FunctionalInterface
-public interface ThrowingFunction<I, O, E extends Exception> {
-    O apply(I input) throws E;
+public interface ThrowingBiConsumer<A, B, E extends Exception> {
+    /**
+     * Perform the action with the provided arguments
+     *
+     * @param a The first argument
+     * @param b The second argument
+     * @throws E The exception that may be thrown if an error occurs
+     */
+    void accept(A a, B b) throws E;
 }

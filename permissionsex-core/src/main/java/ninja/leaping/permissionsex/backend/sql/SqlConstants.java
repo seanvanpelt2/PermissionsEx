@@ -14,14 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ninja.leaping.permissionsex.util;
+package ninja.leaping.permissionsex.backend.sql;
 
-/**
- * An interface defining a function that may throw an exception
- * @param <I>
- * @param <O>
- */
-@FunctionalInterface
-public interface ThrowingFunction<I, O, E extends Exception> {
-    O apply(I input) throws E;
+public class SqlConstants {
+    public static final int UNALLOCATED = -1;
 }

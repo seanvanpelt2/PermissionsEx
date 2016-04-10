@@ -16,16 +16,22 @@
  */
 package ninja.leaping.permissionsex.backend.sql;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import ninja.leaping.configurate.objectmapping.Setting;
 import ninja.leaping.permissionsex.backend.AbstractDataStore;
+import ninja.leaping.permissionsex.backend.ConversionUtils;
 import ninja.leaping.permissionsex.backend.DataStore;
+import ninja.leaping.permissionsex.backend.sql.dao.H2SqlDao;
+import ninja.leaping.permissionsex.backend.sql.dao.MySqlDao;
 import ninja.leaping.permissionsex.data.ContextInheritance;
 import ninja.leaping.permissionsex.data.ImmutableSubjectData;
 import ninja.leaping.permissionsex.exception.PermissionsLoadingException;
 import ninja.leaping.permissionsex.rank.RankLadder;
+import ninja.leaping.permissionsex.util.ThrowingFunction;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
@@ -53,16 +59,23 @@ public final class SqlDataStore extends AbstractDataStore {
     @Setting("url")
     private String connectionUrl;
     @Setting("prefix")
-    private String prefix = "";
+    private String prefix = "pex";
     private String realPrefix;
     @Setting("aliases")
     private Map<String, String> legacyAliases;
 
     private final ConcurrentMap<String, String> queryPrefixCache = new ConcurrentHashMap<>();
+    private final ThreadLocal<SqlDao> heldDao = new ThreadLocal<>();
+    private final Map<String, ThrowingFunction<SqlDataStore, SqlDao, SQLException>> daoImplementations = ImmutableMap.of("mysql", MySqlDao::new, "h2", H2SqlDao::new);
+    private ThrowingFunction<SqlDataStore, SqlDao, SQLException> daoFactory;
     private DataSource sql;
 
     SqlDao getDao() throws SQLException {
-        return new SqlDao(this);
+        SqlDao dao = heldDao.get();
+        if (dao != null) {
+            return dao;
+        }
+        return daoFactory.apply(this);
     }
 
     @Override
@@ -75,11 +88,29 @@ public final class SqlDataStore extends AbstractDataStore {
         } else {
             this.realPrefix = this.prefix;
         }
+
+        // Provide database-implementation specific DAO
+        try (Connection conn = sql.getConnection()) {
+            final String database = conn.getMetaData().getDatabaseProductName().toLowerCase();
+            this.daoFactory = daoImplementations.get(database);
+            if (this.daoFactory == null) {
+                throw new PermissionsLoadingException(t("Database implementation %s is not supported!", database));
+            }
+        } catch (SQLException e) {
+            throw new PermissionsLoadingException(t("Could not connect to SQL database!"), e);
+        }
+
+        // Initialize data
         try (SqlDao dao = getDao()) {
+            System.out.println("Initializing tables");
             dao.initializeTables();
         } catch (SQLException e) {
             throw new PermissionsLoadingException(t("Error interacting with SQL database"), e);
         }
+    }
+
+    public void setConnectionUrl(String connectionUrl) {
+        this.connectionUrl = connectionUrl;
     }
 
     DataSource getDataSource() {
@@ -90,9 +121,9 @@ public final class SqlDataStore extends AbstractDataStore {
         return queryPrefixCache.computeIfAbsent(query, qu -> BRACES_PATTERN.matcher(qu).replaceAll(this.realPrefix));
     }
 
-    // Make getting data asynchronous
+    // TODO Make getting data asynchronous
     @Override
-    protected ImmutableSubjectData getDataInternal(String type, String identifier) throws PermissionsLoadingException {
+    protected SqlSubjectData getDataInternal(String type, String identifier) throws PermissionsLoadingException {
         try (SqlDao dao = getDao()) {
             SubjectRef ref = dao.getOrCreateSubjectRef(type, identifier);
             List<Segment> segments = dao.getSegments(ref);
@@ -101,7 +132,7 @@ public final class SqlDataStore extends AbstractDataStore {
                 contexts.put(segment.getContexts(), segment);
             }
 
-            return new SqlSubjectData(contexts);
+            return new SqlSubjectData(ref, contexts, null);
         } catch (SQLException e) {
             throw new PermissionsLoadingException(t("Error loading permissions for %s %s", type, identifier), e);
         }
@@ -109,7 +140,24 @@ public final class SqlDataStore extends AbstractDataStore {
 
     @Override
     protected CompletableFuture<ImmutableSubjectData> setDataInternal(String type, String identifier, ImmutableSubjectData data) {
-        return null;
+        // Cases: update data for sql (easy), update of another type (get SQL data, do update)
+        SqlSubjectData sqlData;
+        if (data instanceof SqlSubjectData) {
+            sqlData = (SqlSubjectData) data;
+        } else {
+            return runAsync(() -> {
+                SqlSubjectData newData = getDataInternal(type, identifier);
+                ConversionUtils.transfer(data, newData);
+
+                return null;
+            });
+        }
+        return runAsync(() -> {
+            try (SqlDao dao = getDao()) {
+                sqlData.doUpdates(dao);
+                return sqlData;
+            }
+        });
     }
 
     @Override
@@ -177,13 +225,24 @@ public final class SqlDataStore extends AbstractDataStore {
 
     @Override
     protected <T> T performBulkOperationSync(final Function<DataStore, T> function) throws Exception {
-        // Begin a transaction
-        // perform with a single DAO?
-        // maybe changes will be required to the api?
-        /*try (SqlDao dao = getDao()) {
-            dao.executeInTransaction(function)
-        }*/
-        return function.apply(this);
+        SqlDao dao = null;
+        try {
+            dao = getDao();
+            heldDao.set(dao);
+            dao.holdOpen++;
+            T res = function.apply(this);
+            return res;
+        } finally {
+            if (dao != null) {
+                if (--dao.holdOpen == 0) {
+                    heldDao.set(null);
+                }
+                try {
+                    dao.close();
+                } catch (SQLException ignore) {
+                }
+            }
+        }
     }
 
     @Override
