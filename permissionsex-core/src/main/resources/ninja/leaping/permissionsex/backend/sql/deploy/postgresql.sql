@@ -5,6 +5,12 @@
 -- Identifier: varchar(255)
 -- Permission value: smallint
 -- Unique ids: int(11)
+-- Text values: text
+
+CREATE TABLE "{}global" (
+key VARCHAR(255) PRIMARY KEY,
+value TEXT NOT NULL
+);
 
 CREATE TABLE "{}subjects" (
 id int NOT NULL PRIMARY KEY ,
@@ -61,10 +67,9 @@ CONSTRAINT "inheritance_ibfk_2" FOREIGN KEY ("parent") REFERENCES "subjects" ("i
 CREATE TABLE "{}rank_ladders" (
 "id" int(11) NOT NULL AUTO_INCREMENT,
 "name" varchar(255) DEFAULT NULL,
-"idx" int(11) DEFAULT NULL,
 "subject" int(11) DEFAULT NULL,
 PRIMARY KEY ("id"),
-UNIQUE ("name","idx","subject"),
+UNIQUE ("name","subject"),
 KEY "subject" ("subject"),
 FOREIGN KEY ("subject") REFERENCES "subjects" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARSET=utf8;

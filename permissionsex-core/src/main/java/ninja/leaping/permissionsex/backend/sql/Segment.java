@@ -44,9 +44,9 @@ class Segment {
     Segment(int id, Set<Map.Entry<String, String>> contexts, Map<String, Integer> permissions, Map<String, String> options, List<SubjectRef> parents, Integer permissionDefault, ImmutableList<ThrowingBiConsumer<SqlDao, Segment, SQLException>> updates) {
         this.id = id;
         this.contexts = ImmutableSet.copyOf(contexts);
-        this.permissions = ImmutableMap.copyOf(permissions);
-        this.options = ImmutableMap.copyOf(options);
-        this.parents = ImmutableList.copyOf(parents);
+        this.permissions = permissions;
+        this.options = options;
+        this.parents = parents;
         this.permissionDefault = permissionDefault;
         this.updatesToPerform.set(updates);
     }

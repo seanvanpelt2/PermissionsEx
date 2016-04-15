@@ -32,11 +32,6 @@ public class MySqlDao extends SqlDao {
     }
 
     @Override
-    protected String getInsertSubjectRefTypeNameUpdatingQuery() {
-        return "INSERT INTO {}subjects (`type`, `identifier`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `identifier`=VALUES(`identifier`)";
-    }
-
-    @Override
     protected String getInsertOptionUpdatingQuery() {
         return "INSERT INTO {}options (segment, `key`, `value`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)";
     }

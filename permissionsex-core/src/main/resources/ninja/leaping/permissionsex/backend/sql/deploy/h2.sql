@@ -5,12 +5,19 @@
 -- Identifier: varchar(255)
 -- Permission value: smallint
 -- Unique ids: int(11)
+-- Text values: text
 
+CREATE TABLE `{}global` (
+  `key` VARCHAR(255),
+  `value` TEXT NOT NULL,
+  UNIQUE (`key`)
+);
+CREATE INDEX ON `{}global` (`key`);
 
 CREATE TABLE `{}subjects` (
   `id` int(11) NOT NULL IDENTITY,
-  `type` varchar(255) DEFAULT NULL,
-  `identifier` varchar(255) DEFAULT NULL,
+  `type` varchar(255) NOT NULL,
+  `identifier` varchar(255) NOT NULL,
   UNIQUE (`type`,`identifier`),
 );
 CREATE INDEX ON `{}subjects` (`type`);
@@ -26,9 +33,9 @@ CREATE INDEX ON `{}segments` (`subject`);
 
 CREATE TABLE `{}permissions` (
   `segment` int(11) NOT NULL,
-  `key` varchar(255) DEFAULT NULL,
-  `value` smallint DEFAULT NULL,
-  UNIQUE (`segment`,`key`),
+  `key` varchar(255) NOT NULL,
+  `value` smallint NOT NULL,
+  PRIMARY KEY (`segment`,`key`),
   FOREIGN KEY (`segment`) REFERENCES `{}segments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -43,9 +50,9 @@ CREATE TABLE `{}contexts` (
 
 CREATE TABLE `{}options` (
   `segment` int(11) NOT NULL,
-  `key` varchar(255) DEFAULT NULL,
+  `key` varchar(255) NOT NULL,
   `value` text,
-  UNIQUE (`segment`,`key`),
+  PRIMARY KEY (`segment`,`key`),
   FOREIGN KEY (`segment`) REFERENCES `{}segments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -61,10 +68,9 @@ CREATE INDEX ON `{}inheritance`(`parent`);
 
 CREATE TABLE `{}rank_ladders` (
   `id` int(11) NOT NULL IDENTITY ,
-  `name` varchar(255) DEFAULT NULL,
-  `idx` int(11) DEFAULT NULL,
-  `subject` int(11) DEFAULT NULL,
-  UNIQUE (`name`,`idx`,`subject`),
+  `name` varchar(255) NOT NULL,
+  `subject` int(11) NOT NULL,
+  UNIQUE (`name`, `subject`),
   FOREIGN KEY (`subject`) REFERENCES `{}subjects` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -72,10 +78,10 @@ CREATE INDEX ON `{}rank_ladders` (`name`);
 
 CREATE TABLE `{}context_inheritance` (
   `id` int(11) NOT NULL IDENTITY,
-  `child_key` varchar(255) DEFAULT NULL,
-  `child_value` varchar(255) DEFAULT NULL,
-  `parent_key` varchar(255) DEFAULT NULL,
-  `parent_value` varchar(255) DEFAULT NULL,
+  `child_key` varchar(255) NOT NULL,
+  `child_value` varchar(255) NOT NULL,
+  `parent_key` varchar(255) NOT NULL,
+  `parent_value` varchar(255) NOT NULL,
   UNIQUE (`child_key`,`child_value`,`parent_key`,`parent_value`),
 );
 

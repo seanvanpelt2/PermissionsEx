@@ -18,6 +18,7 @@ package ninja.leaping.permissionsex.backend.sql;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import ninja.leaping.configurate.objectmapping.Setting;
 import ninja.leaping.permissionsex.backend.AbstractDataStore;
 import ninja.leaping.permissionsex.backend.ConversionUtils;
@@ -29,6 +30,7 @@ import ninja.leaping.permissionsex.data.ImmutableSubjectData;
 import ninja.leaping.permissionsex.exception.PermissionsLoadingException;
 import ninja.leaping.permissionsex.rank.RankLadder;
 import ninja.leaping.permissionsex.util.ThrowingFunction;
+import ninja.leaping.permissionsex.util.Util;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -36,6 +38,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -102,7 +105,6 @@ public final class SqlDataStore extends AbstractDataStore {
 
         // Initialize data
         try (SqlDao dao = getDao()) {
-            System.out.println("Initializing tables");
             dao.initializeTables();
         } catch (SQLException e) {
             throw new PermissionsLoadingException(t("Error interacting with SQL database"), e);
@@ -126,16 +128,21 @@ public final class SqlDataStore extends AbstractDataStore {
     protected SqlSubjectData getDataInternal(String type, String identifier) throws PermissionsLoadingException {
         try (SqlDao dao = getDao()) {
             SubjectRef ref = dao.getOrCreateSubjectRef(type, identifier);
-            List<Segment> segments = dao.getSegments(ref);
-            Map<Set<Map.Entry<String, String>>, Segment> contexts = new HashMap<>();
-            for (Segment segment : segments) {
-                contexts.put(segment.getContexts(), segment);
-            }
-
-            return new SqlSubjectData(ref, contexts, null);
+            return getDataForRef(dao, ref);
         } catch (SQLException e) {
             throw new PermissionsLoadingException(t("Error loading permissions for %s %s", type, identifier), e);
         }
+    }
+
+    protected SqlSubjectData getDataForRef(SqlDao dao, SubjectRef ref) throws SQLException {
+        List<Segment> segments = dao.getSegments(ref);
+        Map<Set<Entry<String, String>>, Segment> contexts = new HashMap<>();
+        for (Segment segment : segments) {
+            contexts.put(segment.getContexts(), segment);
+        }
+
+        return new SqlSubjectData(ref, contexts, null);
+
     }
 
     @Override
@@ -146,10 +153,13 @@ public final class SqlDataStore extends AbstractDataStore {
             sqlData = (SqlSubjectData) data;
         } else {
             return runAsync(() -> {
-                SqlSubjectData newData = getDataInternal(type, identifier);
-                ConversionUtils.transfer(data, newData);
-
-                return null;
+                try (SqlDao dao = getDao()) {
+                    SubjectRef ref = dao.getOrCreateSubjectRef(type, identifier);
+                    SqlSubjectData newData = getDataForRef(dao, ref);
+                    ConversionUtils.transfer(data, newData);
+                    newData.doUpdates(dao);
+                    return newData;
+                }
             });
         }
         return runAsync(() -> {
@@ -158,16 +168,6 @@ public final class SqlDataStore extends AbstractDataStore {
                 return sqlData;
             }
         });
-    }
-
-    @Override
-    protected RankLadder getRankLadderInternal(String ladder) {
-        return null;
-    }
-
-    @Override
-    protected CompletableFuture<RankLadder> setRankLadderInternal(String ladder, RankLadder newLadder) {
-        return null;
     }
 
     @Override
@@ -199,28 +199,82 @@ public final class SqlDataStore extends AbstractDataStore {
     }
 
     @Override
-    public Iterable<Map.Entry<Map.Entry<String, String>, ImmutableSubjectData>> getAll() {
-        return ImmutableSet.of();
+    public Iterable<Entry<Entry<String, String>, ImmutableSubjectData>> getAll() {
+        try (SqlDao dao = getDao()) {
+            ImmutableSet.Builder<Entry<Entry<String, String>, ImmutableSubjectData>> builder = ImmutableSet.builder();
+            for (SubjectRef ref : dao.getAllSubjectRefs()) {
+                builder.add(Maps.immutableEntry(ref, getDataForRef(dao, ref)));
+            }
+            return builder.build();
+        } catch (SQLException e) {
+            return ImmutableSet.of();
+        }
+    }
+
+    @Override
+    protected RankLadder getRankLadderInternal(String ladder) {
+        try (SqlDao dao = getDao()) {
+            return dao.getRankLadder(ladder);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    protected CompletableFuture<RankLadder> setRankLadderInternal(String ladder, RankLadder newLadder) {
+        return runAsync(() -> {
+            try (SqlDao dao = getDao()) {
+                dao.setRankLadder(ladder, newLadder);
+                return dao.getRankLadder(ladder);
+            }
+        });
     }
 
     @Override
     public Iterable<String> getAllRankLadders() {
-        return ImmutableSet.of();
+        try (SqlDao dao = getDao()) {
+            return dao.getAllRankLadderNames();
+        } catch (SQLException e) {
+            return ImmutableSet.of();
+        }
     }
 
     @Override
     public boolean hasRankLadder(String ladder) {
-        return false;
+        try (SqlDao dao = getDao()) {
+            return dao.hasEntriesForRankLadder(ladder);
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     @Override
     public ContextInheritance getContextInheritanceInternal() {
-        return null;
+        try (SqlDao dao = getDao()) {
+            return dao.getContextInheritance();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public CompletableFuture<ContextInheritance> setContextInheritanceInternal(ContextInheritance inheritance) {
-        return null;
+        return runAsync(() -> {
+            try (SqlDao dao = getDao()) {
+                SqlContextInheritance sqlInheritance;
+                if (inheritance instanceof SqlContextInheritance) {
+                    sqlInheritance = (SqlContextInheritance) inheritance;
+                } else {
+                    sqlInheritance = new SqlContextInheritance(inheritance.getAllParents(), Util.appendImmutable(null, (dao_, inheritance_) -> {
+                        for (Entry<Entry<String, String>, List<Entry<String, String>>> ent : inheritance_.getAllParents().entrySet()) {
+                            dao_.setContextInheritance(ent.getKey(), ent.getValue());
+                        }
+                    }));
+                }
+                sqlInheritance.doUpdate(dao);
+            }
+            return inheritance;
+        });
     }
 
     @Override
@@ -248,5 +302,9 @@ public final class SqlDataStore extends AbstractDataStore {
     @Override
     public void close() {
         this.queryPrefixCache.clear();
+    }
+
+    public void setPrefix(String prefix) {
+        this.prefix = prefix;
     }
 }

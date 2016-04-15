@@ -212,13 +212,13 @@ class SqlSubjectData implements ImmutableSubjectData {
     @Override
     public Map<Set<Entry<String, String>>, List<Entry<String, String>>> getAllParents() {
         return Maps.filterValues(Maps.transformValues(segments,
-                dataEntry -> dataEntry == null ? null : dataEntry.getParents() == null ? null : Lists.transform(dataEntry.getParents(), SubjectRef::toEntry)), v -> v != null);
+                dataEntry -> dataEntry == null ? null : dataEntry.getParents() == null ? null : ImmutableList.copyOf(dataEntry.getParents())), v -> v != null);
     }
 
     @Override
     public List<Entry<String, String>> getParents(Set<Entry<String, String>> segments) {
         Segment ent = this.segments.get(segments);
-        return ent == null || ent.getParents() == null ? Collections.emptyList() : Lists.transform(ent.getParents(), SubjectRef::toEntry);
+        return ent == null || ent.getParents() == null ? Collections.emptyList() : ImmutableList.copyOf(ent.getParents());
     }
 
     @Override
@@ -248,7 +248,7 @@ class SqlSubjectData implements ImmutableSubjectData {
     @Override
     public ImmutableSubjectData setParents(Set<Entry<String, String>> segments, List<Entry<String, String>> parents) {
         Segment entry = getSegmentOrNew(segments);
-        return newWithUpdated(segments, entry.withParents(Lists.transform(parents, ent -> SubjectRef.unresolved(ent.getKey(), ent.getValue()))));
+        return newWithUpdated(segments, entry.withParents(Lists.transform(parents, ent -> ent instanceof SubjectRef ? (SubjectRef) ent : SubjectRef.unresolved(ent.getKey(), ent.getValue()))));
     }
 
     @Override
@@ -293,9 +293,12 @@ class SqlSubjectData implements ImmutableSubjectData {
     }
 
     public void doUpdates(SqlDao dao) throws SQLException {
-        List<ThrowingBiConsumer<SqlDao, SqlSubjectData, SQLException>> updates = this.updatesToPerform.getAndSet(null);
-        for (ThrowingBiConsumer<SqlDao, SqlSubjectData, SQLException> func : updates) {
-            func.accept(dao, this);
-        }
+        dao.executeInTransaction(() -> {
+            List<ThrowingBiConsumer<SqlDao, SqlSubjectData, SQLException>> updates = this.updatesToPerform.getAndSet(null);
+            for (ThrowingBiConsumer<SqlDao, SqlSubjectData, SQLException> func : updates) {
+                func.accept(dao, this);
+            }
+            return null;
+        });
     }
 }

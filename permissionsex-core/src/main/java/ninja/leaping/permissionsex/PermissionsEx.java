@@ -106,7 +106,7 @@ public class PermissionsEx implements ImplementationInterface, Caching<ContextIn
         this.transientData.initialize(this);
         setDebugMode(config.isDebugEnabled());
         initialize(config);
-        convertUuids();
+        //convertUuids();
 
         registerCommand(PermissionsExCommands.createRootCommand(this));
         registerCommand(RankingCommands.getPromoteCommand(this));
