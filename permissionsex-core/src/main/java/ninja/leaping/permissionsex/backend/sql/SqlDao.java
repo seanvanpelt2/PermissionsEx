@@ -528,7 +528,7 @@ public abstract class SqlDao implements AutoCloseable {
     }
 
     private boolean hasTable(String table) throws SQLException {
-        return conn.getMetaData().getTables(null, null, this.ds.insertPrefix(table), null).next();
+        return conn.getMetaData().getTables(null, null, this.ds.insertPrefix(table).toUpperCase(), null).next(); // Upper-case for H2
     }
 
     public void clearOption(Segment segment, String option) throws SQLException {

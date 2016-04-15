@@ -83,21 +83,23 @@ public final class SqlDataStore extends AbstractDataStore {
 
     @Override
     protected void initializeInternal() throws PermissionsLoadingException {
-        sql = getManager().getDataSourceForURL(connectionUrl);
-        if (this.prefix != null && !this.prefix.isEmpty() && !this.prefix.endsWith("_")) {
-            this.realPrefix = this.prefix + "_";
-        } else if (this.prefix == null) {
-            this.realPrefix = "";
-        } else {
-            this.realPrefix = this.prefix;
-        }
+        try {
+            sql = getManager().getDataSourceForURL(connectionUrl);
+            if (this.prefix != null && !this.prefix.isEmpty() && !this.prefix.endsWith("_")) {
+                this.realPrefix = this.prefix + "_";
+            } else if (this.prefix == null) {
+                this.realPrefix = "";
+            } else {
+                this.realPrefix = this.prefix;
+            }
 
-        // Provide database-implementation specific DAO
-        try (Connection conn = sql.getConnection()) {
-            final String database = conn.getMetaData().getDatabaseProductName().toLowerCase();
-            this.daoFactory = daoImplementations.get(database);
-            if (this.daoFactory == null) {
-                throw new PermissionsLoadingException(t("Database implementation %s is not supported!", database));
+            // Provide database-implementation specific DAO
+            try (Connection conn = sql.getConnection()) {
+                final String database = conn.getMetaData().getDatabaseProductName().toLowerCase();
+                this.daoFactory = daoImplementations.get(database);
+                if (this.daoFactory == null) {
+                    throw new PermissionsLoadingException(t("Database implementation %s is not supported!", database));
+                }
             }
         } catch (SQLException e) {
             throw new PermissionsLoadingException(t("Could not connect to SQL database!"), e);
@@ -107,7 +109,7 @@ public final class SqlDataStore extends AbstractDataStore {
         try (SqlDao dao = getDao()) {
             dao.initializeTables();
         } catch (SQLException e) {
-            throw new PermissionsLoadingException(t("Error interacting with SQL database"), e);
+            throw new PermissionsLoadingException(t("Error initializing tables in SQL database!"), e);
         }
     }
 

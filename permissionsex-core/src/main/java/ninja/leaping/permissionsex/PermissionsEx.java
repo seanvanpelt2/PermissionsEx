@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -330,7 +331,7 @@ public class PermissionsEx implements ImplementationInterface, Caching<ContextIn
     }
 
     @Override
-    public DataSource getDataSourceForURL(String url) {
+    public DataSource getDataSourceForURL(String url) throws SQLException {
         return impl.getDataSourceForURL(url);
     }
 

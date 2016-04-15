@@ -506,4 +506,11 @@ public class SqlDaoTest extends PermissionsExTest {
         }
 
     }
+
+    @Test
+    public void testInitializeTables() throws SQLException {
+        try (SqlDao dao = sqlStore.getDao()) {
+            dao.initializeTables(); // Because tables are already initialized, this should do nothing
+        }
+    }
 }
