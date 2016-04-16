@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-04-01 18:03-0700\n"
+"POT-Creation-Date: 2016-04-15 20:24-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -41,13 +41,13 @@ msgstr ""
 msgid "Error while loading data for user %s/%s during prelogin: %s"
 msgstr ""
 
-#: ninja/leaping/permissionsex/sponge/PermissionsExPlugin.java:258
+#: ninja/leaping/permissionsex/sponge/PermissionsExPlugin.java:260
 msgid ""
 "Migrated legacy sponge config directory to new location. Configuration is "
 "now located in %s"
 msgstr ""
 
-#: ninja/leaping/permissionsex/sponge/PermissionsExPlugin.java:240
+#: ninja/leaping/permissionsex/sponge/PermissionsExPlugin.java:242
 msgid "Migrating configuration data from Bukkit"
 msgstr ""
 
@@ -61,11 +61,11 @@ msgstr ""
 msgid "Pre-init of %s v%s"
 msgstr ""
 
-#: ninja/leaping/permissionsex/sponge/PermissionsExPlugin.java:386
+#: ninja/leaping/permissionsex/sponge/PermissionsExPlugin.java:388
 msgid "Unable to get data source for jdbc url %s"
 msgstr ""
 
-#: ninja/leaping/permissionsex/sponge/PermissionsExPlugin.java:309
+#: ninja/leaping/permissionsex/sponge/PermissionsExPlugin.java:311
 msgid "Unable to get subject collection for type %s"
 msgstr ""
 

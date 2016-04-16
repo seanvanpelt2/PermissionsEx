@@ -73,6 +73,11 @@
       <version>${version.configurate}</version>
     </dependency>
     <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+      <version>2.2.6</version>
+    </dependency>
+    <dependency>
       <groupId>com.sk89q</groupId>
       <artifactId>squirrelid</artifactId>
       <version>0.1.0</version>

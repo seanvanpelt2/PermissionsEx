@@ -31,7 +31,6 @@ import ninja.leaping.permissionsex.config.FilePermissionsExConfiguration;
 import ninja.leaping.permissionsex.logging.TranslatableLogger;
 import ninja.leaping.permissionsex.subject.SubjectType;
 import ninja.leaping.permissionsex.util.command.CommandSpec;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -57,8 +56,6 @@ import java.sql.SQLException;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -172,25 +169,26 @@ public class PermissionsExPlugin extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onPlayerPreLogin(final AsyncPlayerPreLoginEvent event) {
-        try {
-            getUserSubjects().load(event.getUniqueId().toString());
-        } catch (ExecutionException e) {
+        getUserSubjects().get(event.getUniqueId().toString()).exceptionally(e -> {
             logger.warn(t("Error while loading data for user %s/%s during prelogin: %s", event.getName(), event.getUniqueId().toString(), e.getMessage()), e);
-        }
+            return null;
+        });
     }
 
     @EventHandler
     public void onPlayerJoin(final PlayerJoinEvent event) {
         final String identifier = event.getPlayer().getUniqueId().toString();
-        if (getUserSubjects().isRegistered(identifier)) {
-            getUserSubjects().persistentData().update(identifier, input -> {
-                if (!event.getPlayer().getName().equals(input.getOptions(PermissionsEx.GLOBAL_CONTEXT).get("name"))) {
-                    return input.setOption(PermissionsEx.GLOBAL_CONTEXT, "name", event.getPlayer().getName());
-                } else {
-                    return input;
-                }
-            });
-        }
+        getUserSubjects().isRegistered(identifier).thenAccept(registered -> {
+            if (registered) {
+                getUserSubjects().persistentData().update(identifier, input -> {
+                    if (!event.getPlayer().getName().equals(input.getOptions(PermissionsEx.GLOBAL_CONTEXT).get("name"))) {
+                        return input.setOption(PermissionsEx.GLOBAL_CONTEXT, "name", event.getPlayer().getName());
+                    } else {
+                        return input;
+                    }
+                });
+            }
+        });
         injectPermissible(event.getPlayer());
     }
 

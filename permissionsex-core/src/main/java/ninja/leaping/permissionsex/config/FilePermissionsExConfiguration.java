@@ -120,7 +120,8 @@ public class FilePermissionsExConfiguration implements PermissionsExConfiguratio
 
     @Override
     public PermissionsExConfiguration reload() throws IOException {
-        FilePermissionsExConfiguration ret = new FilePermissionsExConfiguration(this.loader, this.node);
+        ConfigurationNode node = this.loader.load();
+        FilePermissionsExConfiguration ret = new FilePermissionsExConfiguration(this.loader, node);
         ret.load();
         return ret;
     }

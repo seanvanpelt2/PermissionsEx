@@ -19,6 +19,7 @@ package ninja.leaping.permissionsex.util;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.eventbus.Subscribe;
 import ninja.leaping.permissionsex.PermissionsEx;
 import ninja.leaping.permissionsex.util.command.args.GenericArguments;
 
@@ -58,6 +59,17 @@ public class Util {
         CompletableFuture<T> ret = new CompletableFuture<>();
         ret.completeExceptionally(error);
         return ret;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static final CompletableFuture<Object> EMPTY_FUTURE = new CompletableFuture<>();
+    static {
+        EMPTY_FUTURE.complete(null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> CompletableFuture<T> emptyFuture() {
+        return (CompletableFuture) EMPTY_FUTURE;
     }
 
     public static <I, T> CompletableFuture<T> failableFuture(I value, ThrowingFunction<I, T, ?> func) {

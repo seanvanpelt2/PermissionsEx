@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -125,18 +126,23 @@ public final class SqlDataStore extends AbstractDataStore {
         return queryPrefixCache.computeIfAbsent(query, qu -> BRACES_PATTERN.matcher(qu).replaceAll(this.realPrefix));
     }
 
-    // TODO Make getting data asynchronous
     @Override
-    protected SqlSubjectData getDataInternal(String type, String identifier) throws PermissionsLoadingException {
-        try (SqlDao dao = getDao()) {
-            SubjectRef ref = dao.getOrCreateSubjectRef(type, identifier);
-            return getDataForRef(dao, ref);
-        } catch (SQLException e) {
-            throw new PermissionsLoadingException(t("Error loading permissions for %s %s", type, identifier), e);
-        }
+    protected CompletableFuture<ImmutableSubjectData> getDataInternal(String type, String identifier) {
+        return runAsync(() -> {
+            try (SqlDao dao = getDao()) {
+                Optional<SubjectRef> ref = dao.getSubjectRef(type, identifier);
+                if (ref.isPresent()) {
+                    return getDataForRef(dao, ref.get());
+                } else {
+                    return new SqlSubjectData(SubjectRef.unresolved(type, identifier));
+                }
+            } catch (SQLException e) {
+                throw new PermissionsLoadingException(t("Error loading permissions for %s %s", type, identifier), e);
+            }
+        });
     }
 
-    protected SqlSubjectData getDataForRef(SqlDao dao, SubjectRef ref) throws SQLException {
+    private SqlSubjectData getDataForRef(SqlDao dao, SubjectRef ref) throws SQLException {
         List<Segment> segments = dao.getSegments(ref);
         Map<Set<Entry<String, String>>, Segment> contexts = new HashMap<>();
         for (Segment segment : segments) {
@@ -173,12 +179,12 @@ public final class SqlDataStore extends AbstractDataStore {
     }
 
     @Override
-    public boolean isRegistered(String type, String identifier) {
-        try (SqlDao dao = getDao()) {
-            return dao.getSubjectRef(type, identifier).isPresent();
-        } catch (SQLException e) {
-            return false;
-        }
+    public CompletableFuture<Boolean> isRegistered(String type, String identifier) {
+        return runAsync(() -> {
+            try (SqlDao dao = getDao()) {
+                return dao.getSubjectRef(type, identifier).isPresent();
+            }
+        });
     }
 
     @Override
@@ -214,12 +220,12 @@ public final class SqlDataStore extends AbstractDataStore {
     }
 
     @Override
-    protected RankLadder getRankLadderInternal(String ladder) {
-        try (SqlDao dao = getDao()) {
-            return dao.getRankLadder(ladder);
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+    protected CompletableFuture<RankLadder> getRankLadderInternal(String ladder) {
+        return runAsync(() -> {
+            try (SqlDao dao = getDao()) {
+                return dao.getRankLadder(ladder);
+            }
+        });
     }
 
     @Override
@@ -242,21 +248,21 @@ public final class SqlDataStore extends AbstractDataStore {
     }
 
     @Override
-    public boolean hasRankLadder(String ladder) {
-        try (SqlDao dao = getDao()) {
-            return dao.hasEntriesForRankLadder(ladder);
-        } catch (SQLException e) {
-            return false;
-        }
+    public CompletableFuture<Boolean> hasRankLadder(String ladder) {
+        return runAsync(() -> {
+            try (SqlDao dao = getDao()) {
+                return dao.hasEntriesForRankLadder(ladder);
+            }
+        });
     }
 
     @Override
-    public ContextInheritance getContextInheritanceInternal() {
-        try (SqlDao dao = getDao()) {
-            return dao.getContextInheritance();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+    public CompletableFuture<ContextInheritance> getContextInheritanceInternal() {
+        return runAsync(() -> {
+            try (SqlDao dao = getDao()) {
+                return dao.getContextInheritance();
+            }
+        });
     }
 
     @Override
@@ -286,8 +292,7 @@ public final class SqlDataStore extends AbstractDataStore {
             dao = getDao();
             heldDao.set(dao);
             dao.holdOpen++;
-            T res = function.apply(this);
-            return res;
+            return function.apply(this);
         } finally {
             if (dao != null) {
                 if (--dao.holdOpen == 0) {

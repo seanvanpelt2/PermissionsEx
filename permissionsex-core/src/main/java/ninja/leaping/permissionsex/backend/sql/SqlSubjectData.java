@@ -62,9 +62,7 @@ class SqlSubjectData implements ImmutableSubjectData {
             if (val.isUnallocated()) {
                 updateFunc = (dao, data) -> {};
             } else {
-                updateFunc = (dao, data) -> {
-                    dao.removeSegment(val);
-                };
+                updateFunc = (dao, data) -> dao.removeSegment(val);
             }
         } else if (val.isUnallocated()) { // create new segment
             updateFunc = (dao, data) -> {
@@ -80,12 +78,7 @@ class SqlSubjectData implements ImmutableSubjectData {
             };
         } else { // just run updates
             updateFunc = (dao, data) -> {
-                List<ThrowingBiConsumer<SqlDao, Segment, SQLException>> updateFuncs = val.popUpdates();
-                if (updateFuncs != null) {
-                    for (ThrowingBiConsumer<SqlDao, Segment, SQLException> consumer : updateFuncs) {
-                        consumer.accept(dao, val);
-                    }
-                }
+                val.doUpdates(dao);
             };
         }
         return newWithUpdate(Util.updateImmutable(segments, immutSet(key), val), updateFunc);
