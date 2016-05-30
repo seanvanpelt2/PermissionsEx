@@ -124,4 +124,13 @@ public class SubjectRef implements Map.Entry<String, String> {
     public int hashCode() {
         return Objects.hash(type, identifier);
     }
+
+    @Override
+    public String toString() {
+        return com.google.common.base.Objects.toStringHelper(this)
+                .add("id", id)
+                .add("type", type)
+                .add("identifier", identifier)
+                .toString();
+    }
 }

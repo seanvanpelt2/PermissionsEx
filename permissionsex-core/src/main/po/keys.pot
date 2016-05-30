@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-04-15 20:24-0700\n"
+"POT-Creation-Date: 2016-05-29 19:18-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -108,11 +108,11 @@ msgstr ""
 msgid "Context must be of the form <key>=<value>!"
 msgstr ""
 
-#: ninja/leaping/permissionsex/backend/sql/SqlDataStore.java:106
+#: ninja/leaping/permissionsex/backend/sql/SqlDataStore.java:109
 msgid "Could not connect to SQL database!"
 msgstr ""
 
-#: ninja/leaping/permissionsex/backend/sql/SqlDataStore.java:102
+#: ninja/leaping/permissionsex/backend/sql/SqlDataStore.java:105
 msgid "Database implementation %s is not supported!"
 msgstr ""
 
@@ -180,11 +180,11 @@ msgstr ""
 msgid "Error creating initial data for file backend"
 msgstr ""
 
-#: ninja/leaping/permissionsex/backend/sql/SqlDataStore.java:113
+#: ninja/leaping/permissionsex/backend/sql/SqlDataStore.java:125
 msgid "Error initializing tables in SQL database!"
 msgstr ""
 
-#: ninja/leaping/permissionsex/backend/sql/SqlDataStore.java:140
+#: ninja/leaping/permissionsex/backend/sql/SqlDataStore.java:192
 msgid "Error loading permissions for %s %s"
 msgstr ""
 
@@ -443,6 +443,10 @@ msgstr ""
 msgid "Unterminated quoted string found"
 msgstr ""
 
+#: ninja/leaping/permissionsex/backend/sql/SqlDataStore.java:149
+msgid "Updated database schema from version %s to %s"
+msgstr ""
+
 #: ninja/leaping/permissionsex/util/command/CommandSpec.java:166
 msgid "Usage: %s"
 msgstr ""
@@ -510,6 +514,10 @@ msgstr ""
 msgid "position"
 msgstr ""
 
+#: ninja/leaping/permissionsex/backend/sql/SchemaMigrations.java:289
+msgid "prefix"
+msgstr ""
+
 #: ninja/leaping/permissionsex/command/PermissionsExCommands.java:72
 #: ninja/leaping/permissionsex/command/RankingCommands.java:52
 #: ninja/leaping/permissionsex/command/RankingCommands.java:78
@@ -520,6 +528,10 @@ msgstr ""
 
 #: ninja/leaping/permissionsex/command/PermissionsExCommands.java:75
 msgid "subject-type"
+msgstr ""
+
+#: ninja/leaping/permissionsex/backend/sql/SchemaMigrations.java:298
+msgid "suffix"
 msgstr ""
 
 #: ninja/leaping/permissionsex/command/PermissionsCommands.java:47

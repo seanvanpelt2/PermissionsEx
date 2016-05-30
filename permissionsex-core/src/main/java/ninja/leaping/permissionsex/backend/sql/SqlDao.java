@@ -21,6 +21,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import ninja.leaping.permissionsex.backend.sql.dao.LegacyDao;
+import ninja.leaping.permissionsex.backend.sql.dao.LegacyMigration;
 import ninja.leaping.permissionsex.rank.RankLadder;
 import ninja.leaping.permissionsex.util.ThrowingSupplier;
 
@@ -32,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
@@ -167,7 +170,7 @@ public abstract class SqlDao implements AutoCloseable {
     }
 
     protected String getSelectContextInheritanceQuery() {
-        return "SELECT `child_key`, `child_value`, `parent_key`, `parent_value` FROM {}context_inheritance GROUP BY `child_key`, `child_value`, `parent_key`, `parent_value` ORDER BY `id` ASC";
+        return "SELECT `child_key`, `child_value`, `parent_key`, `parent_value` FROM {}context_inheritance ORDER BY `child_key`, `child_value`, `id` ASC";
     }
 
     protected String getInsertContextInheritanceQuery() {
@@ -202,7 +205,11 @@ public abstract class SqlDao implements AutoCloseable {
         return "SELECT `id`, `type`, `identifier` FROM {}subjects";
     }
 
-    protected PreparedStatement prepareStatement(String query) throws SQLException {
+    public String getRenameTableQuery() {
+        return "ALTER TABLE ? RENAME ?";
+    }
+
+    public PreparedStatement prepareStatement(String query) throws SQLException {
         return conn.prepareStatement(this.ds.insertPrefix(query));
     }
 
@@ -227,6 +234,10 @@ public abstract class SqlDao implements AutoCloseable {
     }
 
     // -- Operations
+
+    public LegacyDao legacy() {
+        return LegacyDao.INSTANCE;
+    }
 
     public Optional<String> getGlobalParameter(String key) throws SQLException {
         try (PreparedStatement stmt = prepareStatement(getSelectGlobalParameterQuery())) {
@@ -492,43 +503,48 @@ public abstract class SqlDao implements AutoCloseable {
     }
 
     public void initializeTables() throws SQLException {
-        if (hasTable("{}permissions")) {
+        if (hasTable("permissions")) {
             return;
         }
         String database = conn.getMetaData().getDatabaseProductName().toLowerCase();
-        try (Statement stmt = conn.createStatement()) {
-            try (InputStream res = SqlDao.class.getResourceAsStream("deploy/" + database + ".sql")) {
-                if (res == null) {
-                    throw new SQLException("No initial schema available for " + database + " databases!");
-                }
-                try (BufferedReader read = new BufferedReader(new InputStreamReader(res, StandardCharsets.UTF_8))) {
-                    StringBuilder currentQuery = new StringBuilder();
-                    String line;
-                    while ((line = read.readLine()) != null) {
-                        if (line.startsWith("--")) {
-                            continue;
-                        }
-
-                        currentQuery.append(line);
-                        if (line.endsWith(";")) {
-                            currentQuery.deleteCharAt(currentQuery.length() - 1);
-                            String queryLine = currentQuery.toString().trim();
-                            currentQuery = new StringBuilder();
-                            if (!queryLine.isEmpty()) {
-                                stmt.addBatch(ds.insertPrefix(queryLine));
-                            }
-                        }
-                    }
-                }
-            } catch (IOException e) {
-                throw new SQLException(e);
+        try (InputStream res = SqlDao.class.getResourceAsStream("deploy/" + database + ".sql")) {
+            if (res == null) {
+                throw new SQLException("No initial schema available for " + database + " databases!");
             }
-            stmt.executeBatch();
+            try (BufferedReader read = new BufferedReader(new InputStreamReader(res, StandardCharsets.UTF_8))) {
+                executeStream(read);
+            }
+        } catch (IOException e) {
+            throw new SQLException(e);
         }
     }
 
+    void executeStream(BufferedReader reader) throws SQLException, IOException {
+        try (Statement stmt = conn.createStatement()) {
+            StringBuilder currentQuery = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("--")) {
+                    continue;
+                }
+
+                currentQuery.append(line);
+                if (line.endsWith(";")) {
+                    currentQuery.deleteCharAt(currentQuery.length() - 1);
+                    String queryLine = currentQuery.toString().trim();
+                    currentQuery = new StringBuilder();
+                    if (!queryLine.isEmpty()) {
+                        stmt.addBatch(ds.insertPrefix(queryLine));
+                    }
+                }
+            }
+            stmt.executeBatch();
+        }
+
+    }
+
     private boolean hasTable(String table) throws SQLException {
-        return conn.getMetaData().getTables(null, null, this.ds.insertPrefix(table).toUpperCase(), null).next(); // Upper-case for H2
+        return conn.getMetaData().getTables(null, null, this.ds.getTableName(table).toUpperCase(), null).next(); // Upper-case for H2
     }
 
     public void clearOption(Segment segment, String option) throws SQLException {
@@ -784,5 +800,50 @@ public abstract class SqlDao implements AutoCloseable {
         if (this.holdOpen <= 0) {
             this.conn.close();
         }
+    }
+
+    public void renameTable(String oldName, String newName) throws SQLException {
+        final String expandedOld = ds.getTableName(oldName);
+        final String expandedNew = ds.getTableName(newName);
+        try (PreparedStatement stmt = prepareStatement(getRenameTableQuery())) {
+            stmt.setString(1, expandedOld);
+            stmt.setString(2, expandedNew);
+            stmt.executeUpdate();
+        }
+    }
+
+    public void deleteTable(String table) throws SQLException {
+        try (PreparedStatement stmt = prepareStatement("DROP TABLE " + ds.getTableName(table))) {
+            stmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Get the schema version. Has to include backwards compatibility to correctly handle pre-2.x schema updates.
+     *
+     * @return The schema version,
+     * @throws SQLException
+     */
+    public int getSchemaVersion() throws SQLException {
+        if (hasTable("global")) { // Current
+            return getGlobalParameter(SqlConstants.OPTION_SCHEMA_VERSION).map(Integer::valueOf).orElse(SqlConstants.VERSION_PRE_VERSIONING);
+        } else if (legacy().hasTable(this, "permissions")) { // Legacy option
+            String ret = legacy().getOption(this, "system", LegacyMigration.Type.WORLD, null, "schema-version");
+            return ret == null ? SqlConstants.VERSION_PRE_VERSIONING : Integer.valueOf(ret);
+        } else {
+            return SqlConstants.VERSION_NOT_INITIALIZED;
+        }
+    }
+
+    public void setSchemaVersion(int version) throws SQLException {
+        setGlobalParameter(SqlConstants.OPTION_SCHEMA_VERSION, Integer.toString(version));
+    }
+
+    public SqlDataStore getDataStore() {
+        return ds;
+    }
+
+    public Connection getConnection() {
+        return conn;
     }
 }

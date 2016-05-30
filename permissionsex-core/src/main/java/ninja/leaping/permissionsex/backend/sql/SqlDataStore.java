@@ -25,6 +25,7 @@ import ninja.leaping.permissionsex.backend.ConversionUtils;
 import ninja.leaping.permissionsex.backend.DataStore;
 import ninja.leaping.permissionsex.backend.sql.dao.H2SqlDao;
 import ninja.leaping.permissionsex.backend.sql.dao.MySqlDao;
+import ninja.leaping.permissionsex.backend.sql.dao.SchemaMigration;
 import ninja.leaping.permissionsex.data.ContextInheritance;
 import ninja.leaping.permissionsex.data.ImmutableSubjectData;
 import ninja.leaping.permissionsex.exception.PermissionsLoadingException;
@@ -47,6 +48,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
+import static ninja.leaping.permissionsex.backend.sql.SchemaMigrations.VERSION_LATEST;
 import static ninja.leaping.permissionsex.util.Translations.t;
 
 /**
@@ -55,6 +57,7 @@ import static ninja.leaping.permissionsex.util.Translations.t;
 public final class SqlDataStore extends AbstractDataStore {
     public static final Factory FACTORY = new Factory("sql", SqlDataStore.class);
     private static final Pattern BRACES_PATTERN = Pattern.compile("\\{\\}");
+    private boolean autoInitialize = true;
 
     protected SqlDataStore() {
         super(FACTORY);
@@ -106,11 +109,46 @@ public final class SqlDataStore extends AbstractDataStore {
             throw new PermissionsLoadingException(t("Could not connect to SQL database!"), e);
         }
 
-        // Initialize data
-        try (SqlDao dao = getDao()) {
-            dao.initializeTables();
+        /*try (SqlDao conn = getDao()) {
+            conn.prepareStatement("ALTER TABLE `{permissions}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci").execute();
+            conn.prepareStatement("ALTER TABLE `{permissions_entity}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci").execute();
+            conn.prepareStatement("ALTER TABLE `{permissions_inheritance}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci").execute();
         } catch (SQLException e) {
-            throw new PermissionsLoadingException(t("Error initializing tables in SQL database!"), e);
+            // Ignore, this MySQL version just doesn't support it.
+        }*/
+
+
+        if (autoInitialize) {
+            try {
+                initializeTables();
+            } catch (SQLException e) {
+                throw new PermissionsLoadingException(t("Error initializing tables in SQL database!"), e);
+            }
+        }
+    }
+
+    public void initializeTables() throws SQLException {
+        List<SchemaMigration> migrations = SchemaMigrations.getMigrations();
+        // Initialize data, perform migrations
+        try (SqlDao dao = getDao()) {
+            int initialVersion = dao.getSchemaVersion();
+            if (initialVersion == SqlConstants.VERSION_NOT_INITIALIZED) {
+                dao.initializeTables();
+                dao.setSchemaVersion(VERSION_LATEST);
+            } else {
+                int finalVersion = dao.executeInTransaction(() -> {
+                    int highestVersion = initialVersion;
+                    for (int i = initialVersion + 1; i < migrations.size(); ++i) {
+                        migrations.get(i).migrate(dao);
+                        highestVersion = i;
+                    }
+                    return highestVersion;
+                });
+                if (initialVersion != finalVersion) {
+                    dao.setSchemaVersion(finalVersion);
+                    getManager().getLogger().info(t("Updated database schema from version %s to %s", initialVersion, finalVersion));
+                }
+            }
         }
     }
 
@@ -120,6 +158,20 @@ public final class SqlDataStore extends AbstractDataStore {
 
     DataSource getDataSource() {
         return this.sql;
+    }
+
+    public String getTableName(String raw) {
+        return getTableName(raw, false);
+    }
+
+    public String getTableName(String raw, boolean legacyOnly) {
+        if (this.legacyAliases != null && this.legacyAliases.containsKey(raw)) {
+            return this.legacyAliases.get(raw);
+        } else if (legacyOnly) {
+            return raw;
+        } else {
+            return this.realPrefix + raw;
+        }
     }
 
     String insertPrefix(String query) {
@@ -313,5 +365,9 @@ public final class SqlDataStore extends AbstractDataStore {
 
     public void setPrefix(String prefix) {
         this.prefix = prefix;
+    }
+
+    public void setAutoInitialize(boolean autoInitialize) {
+        this.autoInitialize = autoInitialize;
     }
 }

@@ -55,12 +55,20 @@ class Segment {
         return new Segment(id, ImmutableSet.of(), ImmutableMap.of(), ImmutableMap.of(), ImmutableList.of(), null, null);
     }
 
+    static Segment empty(int id, Set<Map.Entry<String, String>> contexts) {
+        return new Segment(id, contexts, ImmutableMap.of(), ImmutableMap.of(), ImmutableList.of(), null, null);
+    }
+
     private Segment newWithUpdate(Map<String, Integer> permissions, Map<String, String> options, List<SubjectRef> parents, Integer permissionDefault, ThrowingBiConsumer<SqlDao, Segment, SQLException> updateFunc) {
         return new Segment(this.id, this.contexts, permissions, options, parents, permissionDefault, appendImmutable(this.updatesToPerform.get(), updateFunc));
     }
 
     static Segment unallocated() {
         return Segment.empty(-1);
+    }
+
+    static Segment unallocated(Set<Map.Entry<String, String>> contexts) {
+        return Segment.empty(-1, contexts);
     }
 
     public int getId() {

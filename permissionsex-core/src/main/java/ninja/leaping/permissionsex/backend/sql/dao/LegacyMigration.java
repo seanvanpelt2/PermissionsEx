@@ -14,11 +14,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ninja.leaping.permissionsex.backend.sql;
+package ninja.leaping.permissionsex.backend.sql.dao;
 
-public class SqlConstants {
-    public static final String OPTION_SCHEMA_VERSION = "schema_version";
-    public static final int UNALLOCATED = -1;
-    public static final int VERSION_NOT_INITIALIZED = -2;
-    public static final int VERSION_PRE_VERSIONING = -1;
+/**
+ * Dao to handle legacy operations
+ */
+public interface LegacyMigration extends SchemaMigration {
+
+    enum Type {
+        GROUP, USER, WORLD
+    }
+
 }
